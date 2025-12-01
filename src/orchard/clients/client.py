@@ -8,15 +8,15 @@ import threading
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from proxy_inference_engine.app.ipc_dispatch import IPCState, QueueRegistration
-from proxy_inference_engine.app.model_registry import ModelRegistry
-from proxy_inference_engine.engine import ClientDelta, ClientResponse, UsageStats
-from proxy_inference_engine.formatter.multimodal import (
+from orchard.app.ipc_dispatch import IPCState, QueueRegistration
+from orchard.app.model_registry import ModelRegistry
+from orchard.engine import ClientDelta, ClientResponse, UsageStats
+from orchard.formatter.multimodal import (
     build_multimodal_layout,
     build_multimodal_messages,
 )
-from proxy_inference_engine.ipc.serialization import _build_request_payload
-from proxy_inference_engine.ipc.utils import ResponseDeltaDict, release_delta_resources
+from orchard.ipc.serialization import _build_request_payload
+from orchard.ipc.utils import ResponseDeltaDict, release_delta_resources
 
 logger = logging.getLogger(__name__)
 

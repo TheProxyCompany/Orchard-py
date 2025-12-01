@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 import pynng
 
-from proxy_inference_engine.engine.global_context import GlobalContext
-from proxy_inference_engine.ipc.utils import ResponseDeltaDict
+from orchard.engine.global_context import GlobalContext
+from orchard.ipc.utils import ResponseDeltaDict
 
 logger = logging.getLogger(__name__)
 

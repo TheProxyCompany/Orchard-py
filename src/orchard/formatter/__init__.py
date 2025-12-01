@@ -1,3 +1,3 @@
-from proxy_inference_engine.formatter.formatter import ChatFormatter
+from orchard.formatter.formatter import ChatFormatter
 
 __all__ = ["ChatFormatter"]

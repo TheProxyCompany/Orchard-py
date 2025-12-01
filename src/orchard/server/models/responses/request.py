@@ -2,13 +2,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from proxy_inference_engine.server.models.reasoning import (
+from orchard.server.models.reasoning import (
     DEFAULT_BOOLEAN_REASONING_EFFORT,
     ReasoningEffort,
     normalize_reasoning_effort,
 )
-from proxy_inference_engine.server.models.responses.format import ResponseFormat
-from proxy_inference_engine.server.models.responses.tools import (
+from orchard.server.models.responses.format import ResponseFormat
+from orchard.server.models.responses.tools import (
     Function,
     FunctionID,
     ToolUseMode,

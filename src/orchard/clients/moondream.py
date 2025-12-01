@@ -9,10 +9,10 @@ from typing import Any
 
 from PIL import Image
 
-from proxy_inference_engine.app.ipc_dispatch import IPCState
-from proxy_inference_engine.app.model_registry import ModelRegistry
-from proxy_inference_engine.clients.client import Client
-from proxy_inference_engine.engine import ClientDelta
+from orchard.app.ipc_dispatch import IPCState
+from orchard.app.model_registry import ModelRegistry
+from orchard.clients.client import Client
+from orchard.engine import ClientDelta
 
 logger = logging.getLogger(__name__)
 

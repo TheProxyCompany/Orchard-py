@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from proxy_inference_engine.app.model_resolver import (
+from orchard.app.model_resolver import (
     ModelResolutionError,
     ModelResolver,
 )

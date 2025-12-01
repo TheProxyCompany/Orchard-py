@@ -1,4 +1,4 @@
-from proxy_inference_engine.server.models.chat.output import (
+from orchard.server.models.chat.output import (
     ChatCompletionChoice,
     ChatCompletionChunk,
     ChatCompletionChunkChoice,
@@ -6,7 +6,7 @@ from proxy_inference_engine.server.models.chat.output import (
     ChatCompletionResponse,
     ChatCompletionUsage,
 )
-from proxy_inference_engine.server.models.chat.request import (
+from orchard.server.models.chat.request import (
     ChatCompletionRequest,
     ChatCompletionStreamOptions,
     ChatMessage,

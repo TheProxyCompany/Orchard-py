@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from proxy_inference_engine.clients.moondream import MoondreamClient
-from proxy_inference_engine.engine.inference_engine import InferenceEngine
+from orchard.clients.moondream import MoondreamClient
+from orchard.engine.inference_engine import InferenceEngine
 
 APPLE_IMAGE_PATH = Path(__file__).parent / "assets" / "apple.jpg"
 MOONDREAM_IMAGE_PATH = Path(__file__).parent / "assets" / "moondream.jpg"

@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from proxy_inference_engine.server.dependencies import ModelRegistryDep
+from orchard.server.dependencies import ModelRegistryDep
 
 logger = logging.getLogger(__name__)
 

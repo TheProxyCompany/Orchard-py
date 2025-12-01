@@ -12,17 +12,17 @@ from pathlib import Path
 import dotenv
 from filelock import FileLock
 
-from proxy_inference_engine.app.ipc_dispatch import IPCState
-from proxy_inference_engine.app.model_registry import ModelRegistry
-from proxy_inference_engine.clients import Client, get_client
-from proxy_inference_engine.engine.global_context import GlobalContext, global_context
-from proxy_inference_engine.engine.io import (
+from orchard.app.ipc_dispatch import IPCState
+from orchard.app.model_registry import ModelRegistry
+from orchard.clients import Client, get_client
+from orchard.engine.global_context import GlobalContext, global_context
+from orchard.engine.io import (
     close_sockets,
     get_engine_file_paths,
     initialize_sockets,
     locate_engine_binary,
 )
-from proxy_inference_engine.engine.multiprocess import (
+from orchard.engine.multiprocess import (
     filter_alive_pids,
     pid_is_alive,
     read_pid_file,

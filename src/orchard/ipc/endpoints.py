@@ -7,11 +7,11 @@ from pathlib import Path
 def _resolve_ipc_root() -> Path:
     """
     Determines the stable, user-specific root directory for IPC socket files.
-    This ensures that all PIE processes communicate through a predictable,
+    This ensures that all Orchard processes communicate through a predictable,
     private location, avoiding pollution of system-wide directories like /tmp.
     """
-    # PIE_IPC_ROOT is an escape hatch for development or containerized environments.
-    if ipc_root_env := os.getenv("PIE_IPC_ROOT"):
+    # ORCHARD_IPC_ROOT is an escape hatch for development or containerized environments.
+    if ipc_root_env := os.getenv("ORCHARD_IPC_ROOT"):
         path = Path(ipc_root_env).expanduser().resolve()
     else:
         # Default to the standard application cache directory.
@@ -20,7 +20,7 @@ def _resolve_ipc_root() -> Path:
         base = (
             mac_cache if mac_cache.exists() and mac_cache.is_dir() else home / ".cache"
         )
-        path = base / "com.proxycompany.pie" / "ipc"
+        path = base / "com.theproxycompany.orchard" / "ipc"
 
     path.mkdir(parents=True, exist_ok=True)
     return path

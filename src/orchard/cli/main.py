@@ -6,8 +6,8 @@ from pathlib import Path
 
 import uvicorn
 
-from proxy_inference_engine.engine.inference_engine import InferenceEngine
-from proxy_inference_engine.server.app import create_app
+from orchard.engine.inference_engine import InferenceEngine
+from orchard.server.app import create_app
 
 # Configure logging for the CLI
 logging.basicConfig(

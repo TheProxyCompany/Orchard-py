@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pynng
 
-from proxy_inference_engine.ipc import endpoints as ipc_endpoints
+from orchard.ipc import endpoints as ipc_endpoints
 
 logger = logging.getLogger(__name__)
 

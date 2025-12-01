@@ -5,7 +5,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from .control_tokens import ControlTokens, load_control_tokens
+from orchard.formatter.control_tokens import ControlTokens, load_control_tokens
 
 logger = logging.getLogger(__name__)
 

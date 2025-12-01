@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from proxy_inference_engine.server.models.chat.format import (
+from orchard.server.models.chat.format import (
     ChatCompletionJsonObjectResponseFormat,
     ChatCompletionJSONSchemaResponseFormat,
     ChatCompletionTextResponseFormat,
 )
-from proxy_inference_engine.server.models.chat.request import (
+from orchard.server.models.chat.request import (
     ChatCompletionRequest,
     ChatMessage,
 )
-from proxy_inference_engine.server.models.chat.tools import ChatCompletionTool
-from proxy_inference_engine.server.models.reasoning import ReasoningEffort
+from orchard.server.models.chat.tools import ChatCompletionTool
+from orchard.server.models.reasoning import ReasoningEffort
 
 
 @dataclass

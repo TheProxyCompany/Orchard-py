@@ -6,13 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from proxy_inference_engine.engine.inference_engine import InferenceEngine
-from proxy_inference_engine.server.exceptions import InferenceError
-from proxy_inference_engine.server.routes.chat import chat_router
-from proxy_inference_engine.server.routes.completions import completions_router
-from proxy_inference_engine.server.routes.embeddings import embeddings_router
-from proxy_inference_engine.server.routes.models import models_router
-from proxy_inference_engine.server.routes.responses import responses_router
+from orchard.engine.inference_engine import InferenceEngine
+from orchard.server.exceptions import InferenceError
+from orchard.server.routes.chat import chat_router
+from orchard.server.routes.completions import completions_router
+from orchard.server.routes.embeddings import embeddings_router
+from orchard.server.routes.models import models_router
+from orchard.server.routes.responses import responses_router
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "DEBUG"),

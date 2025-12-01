@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from proxy_inference_engine.app.ipc_dispatch import IPCState
-from proxy_inference_engine.app.model_registry import ModelRegistry
+from orchard.app.ipc_dispatch import IPCState
+from orchard.app.model_registry import ModelRegistry
 
 
 def get_ipc_state(request: Request) -> IPCState:

@@ -11,18 +11,18 @@ from pydantic import (
     model_validator,
 )
 
-from proxy_inference_engine.server.models.chat.format import (
+from orchard.server.models.chat.format import (
     ChatCompletionJsonObjectResponseFormat,
     ChatCompletionJSONSchemaResponseFormat,
     ChatCompletionTextResponseFormat,
 )
-from proxy_inference_engine.server.models.chat.tools import (
+from orchard.server.models.chat.tools import (
     ChatCompletionTool,
     ChatCompletionToolChoice,
     ChatCompletionToolUsage,
     ChatCompletionToolUseMode,
 )
-from proxy_inference_engine.server.models.reasoning import normalize_reasoning_value
+from orchard.server.models.reasoning import normalize_reasoning_value
 
 ReasoningInput = bool | str | dict[str, Any] | None
 

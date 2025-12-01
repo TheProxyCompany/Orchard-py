@@ -4,10 +4,10 @@ import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from proxy_inference_engine.app.model_registry import ModelRegistry
+from orchard.app.model_registry import ModelRegistry
 
 if TYPE_CHECKING:
-    from proxy_inference_engine.app.ipc_dispatch import IPCState
+    from orchard.app.ipc_dispatch import IPCState
 
 
 @dataclass

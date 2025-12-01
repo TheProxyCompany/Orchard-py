@@ -7,8 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from proxy_inference_engine.server.models.responses.format import ResponseFormat
-from proxy_inference_engine.server.models.responses.tools import (
+from orchard.server.models.responses.format import ResponseFormat
+from orchard.server.models.responses.tools import (
     Function,
     FunctionID,
     ToolUseMode,

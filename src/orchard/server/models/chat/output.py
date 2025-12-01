@@ -5,8 +5,8 @@ import time
 
 from pydantic import BaseModel, Field
 
-from proxy_inference_engine.server.models.chat.logprobs import ChatCompletionLogProbs
-from proxy_inference_engine.server.models.chat.request import ChatMessage
+from orchard.server.models.chat.logprobs import ChatCompletionLogProbs
+from orchard.server.models.chat.request import ChatMessage
 
 # --- Constants ---
 CHAT_COMPLETION_ID_PREFIX = "chatcmpl-"

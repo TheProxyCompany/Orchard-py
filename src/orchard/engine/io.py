@@ -9,8 +9,8 @@ from pynng.nng import pynng
 
 logger = logging.getLogger(__name__)
 
-from proxy_inference_engine.app.ipc_dispatch import IPCState
-from proxy_inference_engine.ipc import endpoints as ipc_endpoints
+from orchard.app.ipc_dispatch import IPCState
+from orchard.ipc import endpoints as ipc_endpoints
 
 
 @dataclass(frozen=True)

@@ -8,15 +8,15 @@ from typing import TYPE_CHECKING
 
 from huggingface_hub import snapshot_download
 
-from proxy_inference_engine.app.model_resolver import (
+from orchard.app.model_resolver import (
     ModelResolutionError,
     ModelResolver,
     ResolvedModel,
 )
-from proxy_inference_engine.formatter import ChatFormatter
+from orchard.formatter import ChatFormatter
 
 if TYPE_CHECKING:
-    from proxy_inference_engine.app.ipc_dispatch import IPCState
+    from orchard.app.ipc_dispatch import IPCState
 
 logger = logging.getLogger(__name__)
 

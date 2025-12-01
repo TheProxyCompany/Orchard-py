@@ -4,8 +4,8 @@ from collections.abc import Iterator
 
 import pytest
 
-from proxy_inference_engine.clients import Client
-from proxy_inference_engine.engine import ClientDelta, ClientResponse
+from orchard.clients import Client
+from orchard.engine import ClientDelta, ClientResponse
 
 pytestmark = pytest.mark.asyncio
 

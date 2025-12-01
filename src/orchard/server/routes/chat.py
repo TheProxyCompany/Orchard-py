@@ -11,20 +11,20 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
-from proxy_inference_engine.app.ipc_dispatch import QueueRegistration
-from proxy_inference_engine.app.model_registry import (
+from orchard.app.ipc_dispatch import QueueRegistration
+from orchard.app.model_registry import (
     ModelLoadState,
     ModelResolutionError,
 )
-from proxy_inference_engine.ipc.serialization import _build_request_payload
-from proxy_inference_engine.ipc.utils import (
+from orchard.ipc.serialization import _build_request_payload
+from orchard.ipc.utils import (
     ResponseDeltaDict,
     normalise_delta_payload,
     release_delta_resources,
 )
-from proxy_inference_engine.server.dependencies import IPCStateDep, ModelRegistryDep
-from proxy_inference_engine.server.exceptions import InferenceError
-from proxy_inference_engine.server.models.chat import (
+from orchard.server.dependencies import IPCStateDep, ModelRegistryDep
+from orchard.server.exceptions import InferenceError
+from orchard.server.models.chat import (
     ChatCompletionChoice,
     ChatCompletionChunk,
     ChatCompletionChunkChoice,
@@ -33,12 +33,12 @@ from proxy_inference_engine.server.models.chat import (
     ChatCompletionUsage,
     ChatMessage,
 )
-from proxy_inference_engine.server.models.chat.logprobs import ChatCompletionLogProbs
-from proxy_inference_engine.server.models.chat.output import (
+from orchard.server.models.chat.logprobs import ChatCompletionLogProbs
+from orchard.server.models.chat.output import (
     generate_chat_completion_id,
     get_current_timestamp,
 )
-from proxy_inference_engine.server.utils.batching import normalize_chat_request
+from orchard.server.utils.batching import normalize_chat_request
 
 logger = logging.getLogger(__name__)
 

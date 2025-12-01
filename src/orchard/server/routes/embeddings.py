@@ -7,19 +7,19 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from proxy_inference_engine.app.ipc_dispatch import QueueRegistration
-from proxy_inference_engine.app.model_registry import (
+from orchard.app.ipc_dispatch import QueueRegistration
+from orchard.app.model_registry import (
     ModelLoadState,
     ModelResolutionError,
 )
-from proxy_inference_engine.ipc.serialization import _build_request_payload
-from proxy_inference_engine.ipc.utils import (
+from orchard.ipc.serialization import _build_request_payload
+from orchard.ipc.utils import (
     ResponseDeltaDict,
     release_delta_resources,
 )
-from proxy_inference_engine.server.dependencies import IPCStateDep, ModelRegistryDep
-from proxy_inference_engine.server.exceptions import InferenceError
-from proxy_inference_engine.server.models.embeddings import (
+from orchard.server.dependencies import IPCStateDep, ModelRegistryDep
+from orchard.server.exceptions import InferenceError
+from orchard.server.models.embeddings import (
     EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,

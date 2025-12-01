@@ -10,8 +10,8 @@ import httpx
 import pytest
 import pytest_asyncio
 
-from proxy_inference_engine.clients.client import Client
-from proxy_inference_engine.engine.inference_engine import InferenceEngine
+from orchard.clients.client import Client
+from orchard.engine.inference_engine import InferenceEngine
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ from binascii import Error as BinasciiError
 from collections.abc import Iterable
 from typing import Any
 
-from proxy_inference_engine.formatter import ChatFormatter
+from orchard.formatter import ChatFormatter
 
 logger = logging.getLogger(__name__)
 
