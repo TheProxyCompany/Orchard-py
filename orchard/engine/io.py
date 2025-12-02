@@ -1,8 +1,6 @@
 import logging
-import os
 import time
 from dataclasses import dataclass
-from importlib import resources
 from pathlib import Path
 
 from pynng.nng import pynng
@@ -54,31 +52,6 @@ def cache_root() -> Path:
     target = base / "com.proxycompany.pie"
     target.mkdir(parents=True, exist_ok=True)
     return target
-
-
-def locate_engine_binary() -> Path:
-    try:
-        package_root = Path(str(resources.files("proxy_inference_engine")))
-    except ModuleNotFoundError as exc:  # pragma: no cover - import-time failure
-        raise FileNotFoundError(
-            "proxy_inference_engine package is unavailable."
-        ) from exc
-
-    candidate = (package_root.parent / "bin" / "pie_engine").resolve()
-    if candidate.exists() and os.access(candidate, os.X_OK):
-        return candidate
-
-    # Dev fallback
-    dev_candidate = (
-        Path(__file__).resolve().parents[3] / "release" / "bin" / "pie_engine"
-    )
-    if dev_candidate.exists() and os.access(dev_candidate, os.X_OK):
-        return dev_candidate
-
-    raise FileNotFoundError(
-        f"pie_engine binary not found at expected production path {candidate} or dev path {dev_candidate}."
-        " Build artifacts before using InferenceEngine."
-    )
 
 
 def dial_with_retry(

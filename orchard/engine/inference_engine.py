@@ -15,13 +15,9 @@ from filelock import FileLock
 from orchard.app.ipc_dispatch import IPCState
 from orchard.app.model_registry import ModelRegistry
 from orchard.clients import Client, get_client
+from orchard.engine.fetch import get_engine_path
 from orchard.engine.global_context import GlobalContext, global_context
-from orchard.engine.io import (
-    close_sockets,
-    get_engine_file_paths,
-    initialize_sockets,
-    locate_engine_binary,
-)
+from orchard.engine.io import close_sockets, get_engine_file_paths, initialize_sockets
 from orchard.engine.multiprocess import (
     filter_alive_pids,
     pid_is_alive,
@@ -59,7 +55,7 @@ class InferenceEngine:
         self._setup_logging(client_log_file, engine_log_file)
         self._startup_timeout = float(startup_timeout)
         self._lock = FileLock(str(self._paths.lock_file), timeout=_LOCK_TIMEOUT_S)
-        self._engine_bin = locate_engine_binary()
+        self._engine_bin = get_engine_path()
         self._lease_active = False
         self._closed = False
         self._launch_process: subprocess.Popen | None = None
