@@ -12,8 +12,11 @@ import tarfile
 import threading
 from pathlib import Path
 
+import dotenv
 import requests
 from filelock import FileLock
+
+dotenv.load_dotenv()
 
 MANIFEST_URL = "https://prod.proxy.ing/functions/v1/get-release-manifest"
 DEFAULT_CHANNEL = "stable"
