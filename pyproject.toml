@@ -19,6 +19,9 @@ dependencies = [
 [project.scripts]
 orchard = "orchard.cli.main:main"
 
+[tool.setuptools.packages.find]
+include = ["orchard*"]
+
 [dependency-groups]
 dev = [
     "pytest",
