@@ -6,6 +6,7 @@ from pathlib import Path
 
 import uvicorn
 
+from orchard.engine.fetch import download_engine, get_installed_version
 from orchard.engine.inference_engine import InferenceEngine
 from orchard.server.app import create_app
 
@@ -13,6 +14,8 @@ from orchard.server.app import create_app
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s"
 )
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -33,7 +36,7 @@ async def run_serve(args: argparse.Namespace):
             fastapi_app,
             host=args.host,
             port=args.port,
-            log_level="debug",
+            log_level="warning",
             loop="asyncio",
         )
         server = uvicorn.Server(config)
@@ -49,6 +52,30 @@ def run_engine_stop(args: argparse.Namespace):
         logger.info("Engine shutdown successful.")
     else:
         logger.warning("Engine shutdown was forceful or timed out.")
+        sys.exit(1)
+
+
+def run_upgrade(args: argparse.Namespace):
+    """Handler for the 'upgrade' command."""
+    channel = args.channel
+    current = get_installed_version()
+
+    if current:
+        print(f"\033[34m→\033[0m Current version: {current}")
+    else:
+        print("\033[34m→\033[0m No version currently installed")
+
+    print(f"\033[34m→\033[0m Fetching latest from '{channel}' channel...")
+
+    try:
+        download_engine(channel=channel)
+        new_version = get_installed_version()
+        if new_version == current:
+            print(f"\033[32m✓\033[0m Already on latest: {new_version}")
+        else:
+            print(f"\033[32m✓\033[0m Upgraded to {new_version}")
+    except Exception as e:
+        print(f"\033[31m✗\033[0m Upgrade failed: {e}")
         sys.exit(1)
 
 
@@ -84,6 +111,18 @@ def main():
         help="Seconds to wait for the C++ engine to start.",
     )
     serve_parser.set_defaults(func=run_serve)
+
+    # --- 'upgrade' command ---
+    upgrade_parser = subparsers.add_parser(
+        "upgrade", help="Download and install the latest engine binary."
+    )
+    upgrade_parser.add_argument(
+        "channel",
+        nargs="?",
+        default="stable",
+        help="Release channel to pull from (default: stable).",
+    )
+    upgrade_parser.set_defaults(func=run_upgrade)
 
     # --- 'engine' command group ---
     engine_parser = subparsers.add_parser(

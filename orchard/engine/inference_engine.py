@@ -15,7 +15,11 @@ from filelock import FileLock
 from orchard.app.ipc_dispatch import IPCState
 from orchard.app.model_registry import ModelRegistry
 from orchard.clients import Client, get_client
-from orchard.engine.fetch import get_engine_path
+from orchard.engine.fetch import (
+    check_for_updates_async,
+    get_available_update,
+    get_engine_path,
+)
 from orchard.engine.global_context import GlobalContext, global_context
 from orchard.engine.io import close_sockets, get_engine_file_paths, initialize_sockets
 from orchard.engine.multiprocess import (
@@ -51,6 +55,8 @@ class InferenceEngine:
         startup_timeout: float = 60.0,
         load_models: list[str] | None = None,
     ):
+        check_for_updates_async()  # Fire-and-forget background update check
+
         self._paths = get_engine_file_paths(client_log_file, engine_log_file)
         self._setup_logging(client_log_file, engine_log_file)
         self._startup_timeout = float(startup_timeout)
@@ -328,6 +334,10 @@ class InferenceEngine:
         Returns:
             True if the engine was stopped gracefully, False otherwise.
         """
+        if update := get_available_update():
+            logger.info("Update available: %s", update)
+            print(f"\n\033[33m→\033[0m Update available: {update}")
+            print("  Run \033[1morchard upgrade\033[0m to install\n")
         paths = get_engine_file_paths(None, None)
         lock = FileLock(str(paths.lock_file), timeout=_LOCK_TIMEOUT_S)
 

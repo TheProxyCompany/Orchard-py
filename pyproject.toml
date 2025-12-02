@@ -16,6 +16,9 @@ dependencies = [
     "pynng"
 ]
 
+[project.scripts]
+orchard = "orchard.cli.main:main"
+
 [dependency-groups]
 dev = [
     "pytest",

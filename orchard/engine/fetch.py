@@ -1,9 +1,15 @@
-# orchard/engine/fetch.py
+"""Orchard engine binary fetching and installation."""
+
+from __future__ import annotations
 
 import hashlib
 import io
 import os
+import platform
+import shutil
+import sys
 import tarfile
+import threading
 from pathlib import Path
 
 import requests
@@ -13,10 +19,38 @@ MANIFEST_URL = "https://prod.proxy.ing/functions/v1/get-release-manifest"
 DEFAULT_CHANNEL = "stable"
 ORCHARD_HOME = Path.home() / ".orchard"
 
+REQUEST_TIMEOUT = 30
+DOWNLOAD_TIMEOUT = 600
+MAX_RETRIES = 3
+
+# Cached update check result
+_update_available: str | None = None
+_update_check_done = threading.Event()
+
+
+class FetchError(Exception):
+    """Base exception for fetch operations."""
+
+
+class ManifestError(FetchError):
+    """Failed to fetch or parse release manifest."""
+
+
+class DownloadError(FetchError):
+    """Failed to download engine binary."""
+
+
+class IntegrityError(FetchError):
+    """Downloaded file failed integrity check."""
+
+
+class ExtractionError(FetchError):
+    """Failed to extract downloaded archive."""
+
 
 def get_engine_path() -> Path:
     """Return path to the engine binary, downloading if necessary."""
-    # Check for local dev override first (always wins)
+    # Local dev override always wins
     local_build = os.environ.get("PIE_LOCAL_BUILD")
     if local_build:
         local_path = Path(local_build) / "bin" / "proxy_inference_engine"
@@ -28,99 +62,245 @@ def get_engine_path() -> Path:
 
     binary_path = ORCHARD_HOME / "bin" / "proxy_inference_engine"
 
-    # Fast path: already installed
     if binary_path.exists():
         return binary_path
 
-    # Need to download - use lock to prevent concurrent downloads corrupting the binary
+    # Acquire lock to prevent concurrent downloads
     ORCHARD_HOME.mkdir(parents=True, exist_ok=True)
     lock_path = ORCHARD_HOME / "install.lock"
 
-    with FileLock(str(lock_path), timeout=300):  # 5 min timeout for slow connections
-        # Double-check: another process may have installed while we waited
+    with FileLock(str(lock_path), timeout=300):
+        # Another process may have installed while we waited
         if binary_path.exists():
             return binary_path
 
-        print("Orchard engine not found. Downloading...")
+        _print_status("Orchard engine not found")
         download_engine()
 
     if not binary_path.exists():
-        raise RuntimeError("Download completed but binary not found")
+        raise FetchError("Download completed but binary not found")
 
     return binary_path
 
 
-def download_engine(channel: str = DEFAULT_CHANNEL, version: str | None = None):
-    """Download and install the engine from Supabase."""
+def download_engine(
+    channel: str = DEFAULT_CHANNEL,
+    version: str | None = None,
+) -> None:
+    """Download and install the engine binary."""
+    manifest = _fetch_manifest(channel)
 
-    # 1. Fetch manifest
-    resp = requests.get(MANIFEST_URL, params={"channel": channel})
-    resp.raise_for_status()
-    manifest = resp.json()
-
-    # 2. Resolve version
     if version is None:
-        version = manifest["latest"]
+        version = manifest.get("latest")
+        if not version:
+            raise ManifestError(f"No latest version defined for '{channel}' channel")
 
-    if version not in manifest["versions"]:
-        raise ValueError(f"Version {version} not found in {channel} channel")
-
-    info = manifest["versions"][version]
-    url = info["url"]
-    expected_sha256 = info["sha256"]
-
-    print(f"Downloading Orchard engine {version}...")
-
-    # 3. Download
-    resp = requests.get(url, stream=True)
-    resp.raise_for_status()
-    content = resp.content
-
-    # 4. Verify SHA256
-    actual_sha256 = hashlib.sha256(content).hexdigest()
-    if expected_sha256 and actual_sha256 != expected_sha256:
-        raise RuntimeError(
-            f"SHA256 mismatch!\n"
-            f"  Expected: {expected_sha256}\n"
-            f"  Got:      {actual_sha256}"
+    versions = manifest.get("versions", {})
+    if version not in versions:
+        available = ", ".join(sorted(versions.keys())) or "(none)"
+        raise ManifestError(
+            f"Version '{version}' not found in '{channel}' channel.\n"
+            f"  Available versions: {available}"
         )
 
-    # 5. Extract to ~/.orchard/
-    ORCHARD_HOME.mkdir(parents=True, exist_ok=True)
+    info = versions[version]
+    url = info.get("url")
+    expected_sha256 = info.get("sha256")
 
-    with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
-        tar.extractall(ORCHARD_HOME)
+    if not url:
+        raise ManifestError(f"No download URL for version '{version}'")
 
-    # 6. Make binary executable
-    binary_path = ORCHARD_HOME / "bin" / "proxy_inference_engine"
-    binary_path.chmod(0o755)
+    _print_status(f"Downloading {version}")
+    content = _download_with_progress(url, expected_sha256)
 
-    # 7. Write version file
-    version_file = ORCHARD_HOME / "version.txt"
-    version_file.write_text(version or "")
+    _print_status("Extracting")
+    _extract_and_install(content, version)
 
-    print(f"Orchard engine {version} installed to {ORCHARD_HOME}")
+    _print_status(f"Installed {version}", done=True)
 
 
 def get_installed_version() -> str | None:
     """Return currently installed version, or None if not installed."""
     version_file = ORCHARD_HOME / "version.txt"
     if version_file.exists():
-        return version_file.read_text().strip()
+        return version_file.read_text().strip() or None
     return None
 
 
 def check_for_updates(channel: str = DEFAULT_CHANNEL) -> str | None:
-    """Return latest version if newer than installed, else None."""
+    """Return latest version if an update is available, else None."""
     installed = get_installed_version()
     if not installed:
         return None
 
-    resp = requests.get(MANIFEST_URL, params={"channel": channel})
-    resp.raise_for_status()
-    manifest = resp.json()
-    latest = manifest["latest"]
+    try:
+        manifest = _fetch_manifest(channel)
+        latest = manifest.get("latest")
+        if latest and latest != installed:
+            return latest
+    except FetchError:
+        pass  # Silently ignore update check failures
 
-    if latest != installed:
-        return latest
     return None
+
+
+def check_for_updates_async(channel: str = DEFAULT_CHANNEL) -> None:
+    """Fire-and-forget background update check with telemetry."""
+    thread = threading.Thread(
+        target=_background_update_check,
+        args=(channel,),
+        daemon=True,
+    )
+    thread.start()
+
+
+def get_available_update() -> str | None:
+    """Return cached update version if available, None otherwise. Non-blocking."""
+    if _update_check_done.is_set():
+        return _update_available
+    return None
+
+
+def _background_update_check(channel: str) -> None:
+    """Background thread target for update checking."""
+    global _update_available
+    try:
+        _update_available = check_for_updates(channel)
+    except Exception:
+        pass  # Never crash the background thread
+    finally:
+        _update_check_done.set()
+
+
+def _fetch_manifest(channel: str) -> dict:
+    """Fetch the release manifest from the server."""
+    params = {
+        "channel": channel,
+        "v": get_installed_version() or "unknown",
+        "os": platform.system().lower(),
+        "arch": platform.machine(),
+    }
+
+    try:
+        resp = requests.get(MANIFEST_URL, params=params, timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout as e:
+        raise ManifestError("Timed out fetching release manifest") from e
+    except requests.exceptions.ConnectionError as e:
+        raise ManifestError(
+            "Could not connect to release server.\n"
+            "  Check your internet connection and try again."
+        ) from e
+    except requests.exceptions.HTTPError as e:
+        raise ManifestError(f"Server returned {e.response.status_code}") from e
+    except requests.exceptions.JSONDecodeError as e:
+        raise ManifestError("Invalid manifest format from server") from e
+
+
+def _download_with_progress(url: str, expected_sha256: str | None) -> bytes:
+    """Download file with progress bar and integrity verification."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
+            resp.raise_for_status()
+
+            total = int(resp.headers.get("content-length", 0))
+            chunks: list[bytes] = []
+            downloaded = 0
+
+            for chunk in resp.iter_content(chunk_size=8192):
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                if total:
+                    _print_progress(downloaded, total)
+
+            if total:
+                _clear_progress()
+
+            content = b"".join(chunks)
+
+            if expected_sha256:
+                actual = hashlib.sha256(content).hexdigest()
+                if actual != expected_sha256:
+                    raise IntegrityError(
+                        f"SHA256 verification failed.\n"
+                        f"  Expected: {expected_sha256}\n"
+                        f"  Got:      {actual}\n"
+                        f"  This could indicate a corrupted download or tampering."
+                    )
+
+            return content
+
+        except requests.exceptions.Timeout as e:
+            if attempt == MAX_RETRIES - 1:
+                raise DownloadError("Download timed out after multiple attempts") from e
+            _print_status(f"Timeout, retrying ({attempt + 2}/{MAX_RETRIES})")
+
+        except requests.exceptions.ConnectionError as e:
+            if attempt == MAX_RETRIES - 1:
+                raise DownloadError(
+                    "Connection failed.\n"
+                    "  Check your internet connection and try again."
+                ) from e
+            _print_status(f"Connection lost, retrying ({attempt + 2}/{MAX_RETRIES})")
+
+        except requests.exceptions.HTTPError as e:
+            raise DownloadError(
+                f"Download failed: HTTP {e.response.status_code}"
+            ) from e
+
+    raise DownloadError("Download failed after multiple attempts")
+
+
+def _extract_and_install(content: bytes, version: str) -> None:
+    """Extract tarball and set up the installation."""
+    ORCHARD_HOME.mkdir(parents=True, exist_ok=True)
+    bin_dir = ORCHARD_HOME / "bin"
+
+    # Clean existing bin directory for atomic update
+    if bin_dir.exists():
+        shutil.rmtree(bin_dir)
+
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+            # Security: validate paths before extraction
+            for member in tar.getmembers():
+                if member.name.startswith("/") or ".." in member.name:
+                    raise ExtractionError(f"Unsafe path in archive: {member.name}")
+            tar.extractall(ORCHARD_HOME)
+    except tarfile.TarError as e:
+        raise ExtractionError("Failed to extract archive") from e
+
+    binary_path = bin_dir / "proxy_inference_engine"
+    if not binary_path.exists():
+        raise ExtractionError("Archive did not contain expected binary")
+
+    binary_path.chmod(0o755)
+
+    version_file = ORCHARD_HOME / "version.txt"
+    version_file.write_text(version)
+
+
+def _print_status(message: str, done: bool = False) -> None:
+    """Print a status message."""
+    prefix = "\033[32m✓\033[0m" if done else "\033[34m→\033[0m"
+    print(f"{prefix} {message}")
+
+
+def _print_progress(current: int, total: int) -> None:
+    """Print download progress bar."""
+    width = 40
+    pct = current / total
+    filled = int(width * pct)
+    bar = "█" * filled + "░" * (width - filled)
+    mb_current = current / (1024 * 1024)
+    mb_total = total / (1024 * 1024)
+    sys.stdout.write(f"\r  [{bar}] {mb_current:.1f}/{mb_total:.1f} MB")
+    sys.stdout.flush()
+
+
+def _clear_progress() -> None:
+    """Clear the progress bar line."""
+    sys.stdout.write("\r" + " " * 60 + "\r")
+    sys.stdout.flush()

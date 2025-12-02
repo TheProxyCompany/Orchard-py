@@ -11,15 +11,13 @@ import pytest
 import pytest_asyncio
 
 from orchard.clients.client import Client
+from orchard.engine.fetch import get_engine_path
 from orchard.engine.inference_engine import InferenceEngine
 
 logger = logging.getLogger(__name__)
 
 # These paths should be relative to the project root
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-RELEASE_DIR = PROJECT_ROOT / "release"
-ENGINE_EXE = RELEASE_DIR / "bin/pie_engine"
-SERVER_EXE = RELEASE_DIR / "bin/pie_server"
+PROJECT_ROOT = Path(__file__).parent.parent
 LOG_DIR = PROJECT_ROOT / "logs_test"  # Use a separate log directory for tests
 
 if LOG_DIR.exists():
@@ -90,8 +88,9 @@ async def live_server():
     """
     Starts the FastAPI server in a separate process.
     """
-    if not SERVER_EXE.exists():
-        pytest.fail(f"Server executable not found at {SERVER_EXE}.")
+    server_exe = get_engine_path()
+    if not server_exe.exists():
+        pytest.fail(f"Server executable not found at {server_exe}.")
 
     def server_cleanup():
         logger.info("Server cleanup started.")
@@ -105,7 +104,7 @@ async def live_server():
     server_cmd = [
         sys.executable,
         "-m",
-        "proxy_inference_engine.cli.main",
+        "orchard.cli.main",
         "serve",
         f"--port={SERVER_PORT}",
         "--engine-log-file",
