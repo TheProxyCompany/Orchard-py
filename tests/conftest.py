@@ -31,10 +31,10 @@ SERVER_LOG_PATH = LOG_DIR / "python_server.test.log"
 ENGINE_LOG_PATH = LOG_DIR / "engine.test.log"
 CLIENT_LOG_PATH = LOG_DIR / "client.test.log"
 
+# Model identifiers - use HF repo IDs or aliases
 MODEL_IDS = [
-    "llama-3.1-8b-instruct",
-    "moondream3",
-    # "gemma-3-27b",
+    "meta-llama/Llama-3.1-8B-Instruct",  # HF repo ID
+    "moondream3",  # alias
 ]
 
 SERVER_PORT = 8001

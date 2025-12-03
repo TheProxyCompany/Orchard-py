@@ -10,7 +10,7 @@ from orchard.engine import ClientDelta, ClientResponse
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize("model_id", ["llama-3.1-8b-instruct", "moondream3"])
+@pytest.mark.parametrize("model_id", ["meta-llama/Llama-3.1-8B-Instruct", "moondream3"])
 @pytest.mark.parametrize(
     "prompt",
     [
@@ -43,7 +43,7 @@ async def test_client_chat_non_streaming(
     assert response.usage.completion_tokens == 5
 
 
-@pytest.mark.parametrize("model_id", ["llama-3.1-8b-instruct", "moondream3"])
+@pytest.mark.parametrize("model_id", ["meta-llama/Llama-3.1-8B-Instruct", "moondream3"])
 @pytest.mark.parametrize(
     "prompt",
     [

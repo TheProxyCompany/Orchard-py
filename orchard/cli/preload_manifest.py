@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -23,12 +22,9 @@ class PreloadEntry:
     model_path: str
 
 
-def resolve_models(
-    models: Iterable[str],
-    *,
-    project_root: Path | None = None,
-) -> list[PreloadEntry]:
-    resolver = ModelResolver(project_root=project_root)
+def resolve_models(models: Iterable[str]) -> list[PreloadEntry]:
+    """Resolve model identifiers to local paths via HuggingFace."""
+    resolver = ModelResolver()
     entries: list[PreloadEntry] = []
     seen: set[tuple[str, str]] = set()
 
@@ -74,13 +70,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         dest="models",
         action="append",
         default=[],
-        help="Model identifier to include. Repeat for multiple models.",
-    )
-    parser.add_argument(
-        "--project-root",
-        type=Path,
-        default=None,
-        help="Optional project root to seed ModelResolver lookup.",
+        help="Model identifier (HF repo ID, alias, or local path). Repeat for multiple models.",
     )
     parser.add_argument(
         "--quiet",
@@ -95,13 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.models:
         raise SystemExit("At least one --model must be provided.")
 
-    project_root = args.project_root
-    if project_root is None:
-        env_root = os.getenv("PIE_PROJECT_ROOT")
-        if env_root:
-            project_root = Path(env_root)
-
-    entries = resolve_models(args.models, project_root=project_root)
+    entries = resolve_models(args.models)
     write_manifest(entries, args.output)
 
     if not args.quiet:

@@ -5,7 +5,7 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
-MODEL_ID = "llama-3.1-8b-instruct"
+MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 
 
 async def test_chat_completion_multi_token_non_streaming(live_server):

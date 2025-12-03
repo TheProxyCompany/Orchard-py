@@ -322,14 +322,17 @@ class ModelRegistry:
         return None
 
     def list_models(self) -> list[dict[str, str]]:
+        """List all currently loaded models."""
         catalog = []
-        for entry in self._resolver.list_entries():
-            payload = dict(entry.metadata)
-            payload["canonical_id"] = entry.canonical_id
-            payload["model_path"] = str(entry.model_path)
-            payload["source"] = entry.source
-            payload["hf_repo"] = entry.hf_repo or ""
-            payload["aliases"] = ", ".join(sorted(entry.aliases))
+        for canonical_id, entry in self._entries.items():
+            if entry.resolved is None:
+                continue
+            payload = dict(entry.resolved.metadata)
+            payload["canonical_id"] = canonical_id
+            payload["model_path"] = str(entry.resolved.model_path)
+            payload["source"] = entry.resolved.source
+            payload["hf_repo"] = entry.resolved.hf_repo or ""
+            payload["state"] = entry.state.name
             catalog.append(payload)
         return catalog
 
@@ -529,20 +532,13 @@ class ModelRegistry:
             entry.activation_future = None
             entry.activation_loop = None
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
     def _canonicalize(self, model_id: str) -> str | None:
+        """Convert a model ID to its canonical form if known."""
         if model_id in self._entries:
             return model_id
         lower = model_id.lower()
         if lower in self._alias_cache:
             return self._alias_cache[lower]
-        entry = self._resolver.lookup_alias(model_id)
-        if entry:
-            canonical = entry.canonical_id
-            self._alias_cache[lower] = canonical
-            return canonical
         return None
 
 
