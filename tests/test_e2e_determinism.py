@@ -10,9 +10,6 @@ async def test_multi_candidate_determinism(live_server, model_id, batch_size):
     """
     Tests a non-streaming request that requires multiple candidates to be generated.
     """
-    if model_id == "moondream3":
-        pytest.skip(reason="moondream 3 determinism acting weird")
-
     server_url = live_server
     request_payload = {
         "model": model_id,
@@ -65,9 +62,6 @@ async def test_sequential_request_determinism(live_server, model_id):
     """
     Tests a sequential request that generates the same content multiple times.
     """
-    if model_id == "moondream3":
-        pytest.skip(reason="moondream 3 determinism acting weird")
-
     server_url = live_server
     request_payload = {
         "model": model_id,
