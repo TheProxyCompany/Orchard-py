@@ -26,8 +26,7 @@ include = [
 
 [tool.setuptools.package-data]
 orchard = [
-    "formatter/profiles/*/control_tokens.json",
-    "formatter/profiles/*/templates/*",
+    "formatter/profiles/**"
 ]
 
 [dependency-groups]
