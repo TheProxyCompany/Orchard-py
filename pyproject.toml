@@ -19,6 +19,18 @@ dependencies = [
 [project.scripts]
 orchard = "orchard.cli.main:main"
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "build",
+    "twine",
+    "ruff",
+    "pre-commit",
+    "ty>=0.0.1a29",
+]
+
 [tool.setuptools.packages.find]
 include = [
     "orchard*",
