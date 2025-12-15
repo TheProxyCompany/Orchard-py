@@ -89,10 +89,49 @@ class Client:
                 except asyncio.QueueEmpty:
                     break
 
+    @staticmethod
+    def _is_batched_messages(messages: list) -> bool:
+        """Check if messages is a batch (list of conversations) or single conversation."""
+        if not messages:
+            return False
+        # Batched: [[{role, content}, ...], [{role, content}, ...]]
+        # Single: [{role, content}, ...]
+        return isinstance(messages[0], list)
+
+    @staticmethod
+    def _normalize_messages(messages: list) -> list[list[dict]]:
+        """Normalize messages to always be a list of conversations."""
+        if Client._is_batched_messages(messages):
+            return messages
+        return [messages]
+
     async def achat(
-        self, model_id: str, messages: list[dict], stream: bool = False, **kwargs: Any
-    ) -> ClientResponse | AsyncIterator[ClientDelta]:
-        """Asynchronously performs a chat completion."""
+        self,
+        model_id: str,
+        messages: list[dict] | list[list[dict]],
+        stream: bool = False,
+        **kwargs: Any,
+    ) -> ClientResponse | list[ClientResponse] | AsyncIterator[ClientDelta]:
+        """
+        Asynchronously performs a chat completion.
+
+        Args:
+            model_id: The model to use for generation.
+            messages: Either a single conversation (list of message dicts) or
+                     a batch of conversations (list of list of message dicts).
+            stream: If True, returns an async iterator of deltas.
+            **kwargs: Additional generation parameters.
+
+        Returns:
+            - Single conversation, non-streaming: ClientResponse
+            - Batched conversations, non-streaming: list[ClientResponse]
+            - Streaming (single or batched): AsyncIterator[ClientDelta]
+              (use delta.prompt_index to demultiplex batched streams)
+        """
+        is_batched = self._is_batched_messages(messages)
+        conversations = self._normalize_messages(messages)
+        batch_size = len(conversations)
+
         request_id = await self._ipc_state.get_next_request_id()
         response_queue: asyncio.Queue[ResponseDeltaDict] = asyncio.Queue()
         owner_loop = asyncio.get_running_loop()
@@ -110,7 +149,9 @@ class Client:
             self._ipc_state.active_request_queues.pop(request_id, None)
 
         try:
-            await self._asubmit_request(request_id, model_id, messages, **kwargs)
+            await self._asubmit_request_batch(
+                request_id, model_id, conversations, **kwargs
+            )
 
             async def _stream_generator() -> AsyncIterator[ClientDelta]:
                 try:
@@ -127,16 +168,35 @@ class Client:
                     delta async for delta in self._async_process_stream(response_queue)
                 ]
                 _cleanup_queue()
-                return self._aggregate_response(deltas)
+                responses = self._aggregate_batch_response(deltas, batch_size)
+                return responses if is_batched else responses[0]
         finally:
             if not stream or not stream_managed_cleanup:
                 _cleanup_queue()
 
     def chat(
-        self, model_id: str, messages: list[dict], stream: bool = False, **kwargs: Any
-    ) -> ClientResponse | Iterator[ClientDelta]:
-        """Synchronously performs a chat completion."""
+        self,
+        model_id: str,
+        messages: list[dict] | list[list[dict]],
+        stream: bool = False,
+        **kwargs: Any,
+    ) -> ClientResponse | list[ClientResponse] | Iterator[ClientDelta]:
+        """
+        Synchronously performs a chat completion.
 
+        Args:
+            model_id: The model to use for generation.
+            messages: Either a single conversation (list of message dicts) or
+                     a batch of conversations (list of list of message dicts).
+            stream: If True, returns an iterator of deltas.
+            **kwargs: Additional generation parameters.
+
+        Returns:
+            - Single conversation, non-streaming: ClientResponse
+            - Batched conversations, non-streaming: list[ClientResponse]
+            - Streaming (single or batched): Iterator[ClientDelta]
+              (use delta.prompt_index to demultiplex batched streams)
+        """
         # We need a running event loop in a background thread
         if (
             not self._sync_loop
@@ -158,9 +218,7 @@ class Client:
             # in a synchronous generator that pulls from it.
             return self._sync_iterator_bridge(result)
         else:
-            assert isinstance(result, ClientResponse), (
-                f"Expected ClientResponse, got {type(result)}"
-            )
+            # Could be ClientResponse or list[ClientResponse]
             return result
 
     def _start_sync_event_loop(self) -> None:
@@ -278,6 +336,24 @@ class Client:
             usage=usage,
             deltas=deltas,
         )
+
+    def _aggregate_batch_response(
+        self, deltas: list[ClientDelta], batch_size: int
+    ) -> list[ClientResponse]:
+        """Aggregate deltas into a list of ClientResponses, one per prompt in batch."""
+        # Group deltas by prompt_index
+        deltas_by_prompt: dict[int, list[ClientDelta]] = {
+            i: [] for i in range(batch_size)
+        }
+        for delta in deltas:
+            idx = delta.prompt_index if delta.prompt_index is not None else 0
+            if idx < batch_size:
+                deltas_by_prompt[idx].append(delta)
+
+        # Create a ClientResponse for each prompt
+        return [
+            self._aggregate_response(deltas_by_prompt[i]) for i in range(batch_size)
+        ]
 
     async def _asubmit_request(
         self, request_id: int, model_id: str, messages: list[dict], **kwargs: Any
@@ -410,6 +486,151 @@ class Client:
             request_type="generation",
             response_channel_id=response_channel_id,
             prompts=[prompt_payload],
+        )
+        socket = self._ipc_state.request_socket
+        if socket is None:
+            raise RuntimeError("Request socket is not initialized.")
+
+        await socket.asend(request_bytes)
+
+    async def _asubmit_request_batch(
+        self,
+        request_id: int,
+        model_id: str,
+        conversations: list[list[dict]],
+        **kwargs: Any,
+    ):
+        """Prepares and submits a batched request over the pynng IPC channel."""
+        info = await self._model_registry.get_info(model_id)
+
+        reasoning_effort = kwargs.get("reasoning_effort")
+        reasoning_flag = bool(kwargs.get("reasoning") or reasoning_effort)
+
+        # Shared generation parameters
+        temperature = float(kwargs.get("temperature", 1.0))
+        top_p = float(kwargs.get("top_p", 1.0))
+        top_k = int(kwargs.get("top_k", -1))
+        min_p = float(kwargs.get("min_p", 0.0))
+        max_generated_tokens = int(kwargs.get("max_generated_tokens", 1024))
+        top_logprobs = int(kwargs.get("top_logprobs", 0))
+        frequency_penalty = float(kwargs.get("frequency_penalty", 0.0))
+        presence_penalty = float(kwargs.get("presence_penalty", 0.0))
+        repetition_context_size = int(kwargs.get("repetition_context_size", 60))
+        repetition_penalty = float(kwargs.get("repetition_penalty", 1.0))
+        logit_bias = {
+            int(k): float(v) for k, v in (kwargs.get("logit_bias") or {}).items()
+        }
+        stop_sequences = self._normalize_stop_sequences(kwargs.get("stop"))
+        tool_schemas_json = self._serialize_tools(kwargs.get("tools"))
+        response_format_json = self._serialize_optional_payload(
+            kwargs.get("response_format")
+        )
+        num_candidates = max(1, int(kwargs.get("n", 1)))
+        best_of = int(kwargs.get("best_of", num_candidates))
+        if best_of <= 0:
+            best_of = num_candidates
+        final_candidates = int(kwargs.get("final_candidates", best_of))
+        if final_candidates <= 0:
+            final_candidates = best_of
+
+        # Build a prompt payload for each conversation
+        prompt_payloads = []
+        for messages in conversations:
+            try:
+                messages_for_template, image_buffers, capabilities, content_order = (
+                    build_multimodal_messages(
+                        formatter=info.formatter,
+                        items=messages,
+                        instructions=kwargs.get("instructions"),
+                    )
+                )
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Invalid chat message payload: {exc}") from exc
+
+            if not messages_for_template:
+                raise ValueError("Chat request must include at least one content segment.")
+
+            prompt_text = info.formatter.apply_template(
+                messages_for_template,
+                reasoning=reasoning_flag,
+                task=kwargs.get("task_name"),
+            )
+            try:
+                layout_segments = build_multimodal_layout(
+                    prompt_text,
+                    image_buffers,
+                    capabilities,
+                    content_order,
+                    info.formatter.control_tokens.start_image_token
+                    or info.formatter.default_image_placeholder,
+                    info.formatter.should_clip_image_placeholder,
+                    coord_placeholder=info.formatter.control_tokens.coord_placeholder,
+                )
+            except ValueError as exc:
+                raise ValueError(f"Invalid multimodal layout: {exc}") from exc
+
+            if info.formatter.should_clip_image_placeholder:
+                prompt_text = prompt_text.replace(
+                    info.formatter.default_image_placeholder, ""
+                )
+
+            if info.formatter.control_tokens.coord_placeholder:
+                prompt_text = prompt_text.replace(
+                    info.formatter.control_tokens.coord_placeholder, ""
+                )
+
+            prompt_bytes = prompt_text.encode("utf-8")
+            capabilities_payload = [
+                {"name": cap.name, "payload": cap.payload, "position": 0}
+                for cap in capabilities
+            ]
+
+            # Each prompt gets its own rng seed
+            rng_seed = int(kwargs.get("rng_seed", random.randint(0, 2**32 - 1)))
+
+            prompt_payloads.append({
+                "prompt_bytes": prompt_bytes,
+                "image_buffers": image_buffers,
+                "capabilities": capabilities_payload,
+                "layout": layout_segments,
+                "sampling_params": {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "min_p": min_p,
+                    "rng_seed": rng_seed,
+                },
+                "logits_params": {
+                    "top_logprobs": top_logprobs,
+                    "frequency_penalty": frequency_penalty,
+                    "presence_penalty": presence_penalty,
+                    "repetition_context_size": repetition_context_size,
+                    "repetition_penalty": repetition_penalty,
+                    "logit_bias": logit_bias,
+                },
+                "max_generated_tokens": max_generated_tokens,
+                "stop_sequences": stop_sequences,
+                "tool_schemas_json": tool_schemas_json,
+                "response_format_json": response_format_json,
+                "num_candidates": num_candidates,
+                "best_of": best_of,
+                "final_candidates": final_candidates,
+                "task_name": kwargs.get("task_name"),
+                "reasoning_effort": reasoning_effort,
+            })
+
+        response_channel_id = self._ipc_state.response_channel_id or request_id
+        logger.debug(
+            f"Submitting batched request {request_id} for model {model_id} "
+            f"with {len(prompt_payloads)} prompts, response channel: {response_channel_id}"
+        )
+        request_bytes = _build_request_payload(
+            request_id=request_id,
+            model_id=model_id,
+            model_path=info.model_path,
+            request_type="generation",
+            response_channel_id=response_channel_id,
+            prompts=prompt_payloads,
         )
         socket = self._ipc_state.request_socket
         if socket is None:
