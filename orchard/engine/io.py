@@ -55,7 +55,7 @@ def cache_root() -> Path:
 
 
 def dial_with_retry(
-    socket: pynng.Socket, url: str, attempts: int = 5, delay: float = 0.2
+    socket: pynng.Socket, url: str, attempts: int = 50, delay: float = 0.2
 ) -> None:
     last_exc: Exception | None = None
     for attempt in range(attempts):
@@ -67,7 +67,7 @@ def dial_with_retry(
                 "Failed to connect to IPC endpoint %s: %s (attempt %d)",
                 url,
                 exc,
-                attempt,
+                attempt + 1,
             )
             last_exc = exc
             time.sleep(delay)

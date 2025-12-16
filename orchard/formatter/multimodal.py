@@ -170,7 +170,7 @@ def build_multimodal_messages(
                         f"Text content missing for part {part_index} in message {message_index}."
                     )
                 parts.append(_RenderableText(str(text_value)))
-            elif normalized_type in {"input_image", "image"}:
+            elif normalized_type in {"input_image", "image", "image_url"}:
                 image_url = _get_field(content_part, "image_url")
                 if isinstance(image_url, dict):
                     image_url = image_url.get("url") or image_url.get("data")
